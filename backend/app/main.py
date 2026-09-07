@@ -11,9 +11,11 @@ from app.api import (
     actions,
     campaigns,
     characters,
+    combat,
     export,
     locations,
     npcs,
+    scenes,
     settings as settings_api,
     stream,
 )
@@ -56,6 +58,8 @@ app.include_router(characters.router)
 app.include_router(npcs.router)
 app.include_router(locations.router)
 app.include_router(actions.router)
+app.include_router(combat.router)
+app.include_router(scenes.router)
 app.include_router(stream.router)
 app.include_router(settings_api.router)
 app.include_router(export.router)

@@ -41,11 +41,35 @@ def build_narration_prompt(
         if pc.conditions:
             parts.append(f"Conditions: {', '.join(pc.conditions)}")
 
+        # Warn the narrator about dangerous conditions / low resources.
+        warnings = []
+        for k, v in res.items():
+            cur = v.get("current", 0)
+            mx = v.get("max", 0) or 0
+            if mx and cur / mx <= 0.25 and k.lower() in {"hp", "health", "endurance"}:
+                warnings.append(f"{pc.name}'s {k} is critically low ({cur}/{mx})")
+        if warnings:
+            parts.append("Warnings: " + "; ".join(warnings))
+
     if npcs:
-        parts.append("\nNPCs present:")
+        parts.append("\nNPCs present (stay consistent with each personality):")
         for n in npcs:
             activity = f" ({n.current_activity})" if n.current_activity else ""
             parts.append(f"- {n.name}: {n.description}{activity}")
+            personality = n.personality or {}
+            traits = personality.get("traits") or personality.get("personality")
+            if traits:
+                parts.append(f"    Personality: {traits}")
+            for extra_key in ("motivation", "goal", "voice", "mood"):
+                if personality.get(extra_key):
+                    parts.append(f"    {extra_key.capitalize()}: {personality[extra_key]}")
+
+    # Active quests give the narration direction and stakes.
+    active_quests = [q for q in state.quests if q.status == "active"]
+    if active_quests:
+        parts.append("\n=== ACTIVE QUESTS ===")
+        for q in active_quests[:5]:
+            parts.append(f"- {q.title}")
 
     if relevant:
         parts.append("\n=== RELEVANT MEMORIES ===")
@@ -53,8 +77,8 @@ def build_narration_prompt(
             parts.append(f"- {m}")
 
     if short_term:
-        parts.append("\n=== RECENT EVENTS ===")
-        for s in short_term[-6:]:
+        parts.append("\n=== RECENT EVENTS (most recent last) ===")
+        for s in short_term[-5:]:
             parts.append(f"- {s}")
 
     parts.append("\n=== PLAYER ACTION ===")
@@ -68,6 +92,11 @@ def build_narration_prompt(
             f"Dice rolled: {d.get('notation')} -> rolls {d.get('rolls')} "
             f"(total {d.get('total')})"
         )
+        # Surface any ruleset-specific dice detail so the narrator honours it exactly.
+        for detail_key in ("feat_die", "success_dice", "sixes", "tn", "successes", "banes",
+                           "pushed", "panic", "ill_omen", "auto_success"):
+            if detail_key in d:
+                parts.append(f"  {detail_key}: {d[detail_key]}")
     parts.append(f"Outcome: {result.outcome_label}")
     parts.append(f"Mechanical summary: {result.mechanical_description}")
     if result.state_mutations:
@@ -75,9 +104,22 @@ def build_narration_prompt(
         for m in result.state_mutations:
             parts.append(f"- {m.to_dict()}")
 
+    parts.append("\n=== NARRATION INSTRUCTIONS ===")
     parts.append(
-        "\nNarrate the outcome of this action vividly and consistently with the mechanical "
-        "result above. Do not restate the numbers; weave them into the fiction."
+        "Narrate the outcome of this action vividly and consistently with the mechanical result "
+        "above. Follow these constraints strictly:"
+    )
+    parts.append(
+        "1. NEVER contradict, recompute, or invent dice results, damage, hit points, or any "
+        "numeric mechanic — the values above are authoritative."
+    )
+    parts.append(
+        "2. Do NOT restate raw numbers; weave the mechanical outcome into the fiction so the "
+        "consequences are clear from the prose."
+    )
+    parts.append(
+        "3. Stay in the established fiction and voice; keep NPCs true to their personalities and "
+        "end at a natural beat that invites the player's next action."
     )
 
     return system, "\n".join(parts)

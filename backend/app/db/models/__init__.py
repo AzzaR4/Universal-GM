@@ -43,6 +43,7 @@ class Campaign(Base):
     gm_config: Mapped[dict] = mapped_column(JSON, default=dict)
     ruleset_config: Mapped[dict] = mapped_column(JSON, default=dict)
     world_state: Mapped[dict] = mapped_column(JSON, default=dict)
+    active_combat: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)
     current_location_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

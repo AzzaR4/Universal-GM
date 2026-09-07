@@ -5,15 +5,20 @@ import { api, streamAction } from '../api/client'
 import {
   useCampaign,
   useCharacters,
+  useCombat,
+  useCombatAction,
   useCreateLocation,
   useCreateNPC,
+  useEndCombat,
   useEvents,
   useLocations,
   useNPCs,
+  useStartCombat,
 } from '../hooks/queries'
 import { useSessionStore } from '../stores/sessionStore'
 import { Button, Input, Textarea } from '../lib/ui'
 import CharacterPanel from '../components/CharacterPanel'
+import CombatTracker from '../components/CombatTracker'
 import WorldPanel from '../components/WorldPanel'
 import DiceDisplay from '../components/DiceDisplay'
 import Modal from '../components/Modal'
@@ -31,6 +36,12 @@ export default function Game() {
 
   const createNPC = useCreateNPC(id)
   const createLocation = useCreateLocation(id)
+
+  const { data: combatData } = useCombat(id)
+  const startCombat = useStartCombat(id)
+  const combatAction = useCombatAction(id)
+  const endCombat = useEndCombat(id)
+  const combat = combatData?.combat && combatData.active ? combatData.combat : null
 
   const {
     messages,
@@ -119,6 +130,15 @@ export default function Game() {
           <span className="text-sm text-ember-400">{campaign?.name}</span>
         </div>
         <div className="flex gap-2">
+          {!combat && (
+            <Button
+              variant="danger"
+              onClick={() => startCombat.mutate({})}
+              disabled={startCombat.isPending}
+            >
+              ⚔ Start Combat
+            </Button>
+          )}
           <Button variant="secondary" onClick={exportCampaign}>
             ⬇ Export
           </Button>
@@ -132,7 +152,7 @@ export default function Game() {
       <div className="grid flex-1 grid-cols-1 overflow-hidden md:grid-cols-[280px_1fr_300px]">
         {/* Left */}
         <aside className="hidden border-r border-ink-700 bg-ink-900/40 md:block">
-          <CharacterPanel character={pc} />
+          <CharacterPanel character={pc} rulesetId={campaign?.ruleset_id} />
         </aside>
 
         {/* Center */}
@@ -205,13 +225,22 @@ export default function Game() {
 
         {/* Right */}
         <aside className="hidden border-l border-ink-700 bg-ink-900/40 md:block">
-          <WorldPanel
-            location={currentLocation}
-            npcs={npcsHere}
-            events={events || []}
-            onAddNPC={() => setModal('npc')}
-            onAddLocation={() => setModal('location')}
-          />
+          {combat ? (
+            <CombatTracker
+              combat={combat}
+              busy={combatAction.isPending}
+              onAction={(d) => combatAction.mutate(d)}
+              onEnd={() => endCombat.mutate()}
+            />
+          ) : (
+            <WorldPanel
+              location={currentLocation}
+              npcs={npcsHere}
+              events={events || []}
+              onAddNPC={() => setModal('npc')}
+              onAddLocation={() => setModal('location')}
+            />
+          )}
         </aside>
       </div>
 

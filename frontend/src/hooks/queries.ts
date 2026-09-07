@@ -29,6 +29,37 @@ export const useProviders = () =>
 export const useProviderPresets = () =>
   useQuery({ queryKey: ['presets'], queryFn: api.providerPresets })
 
+export const useCombat = (cid: string) =>
+  useQuery({ queryKey: ['combat', cid], queryFn: () => api.getCombat(cid), enabled: !!cid })
+
+export const useStartCombat = (cid: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { enemy_ids?: string[]; default_enemy_hp?: number } = {}) =>
+      api.startCombat(cid, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['combat', cid] }),
+  })
+}
+
+export const useCombatAction = (cid: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: Parameters<typeof api.combatAction>[1]) => api.combatAction(cid, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['combat', cid] })
+      qc.invalidateQueries({ queryKey: ['characters', cid] })
+    },
+  })
+}
+
+export const useEndCombat = (cid: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.endCombat(cid),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['combat', cid] }),
+  })
+}
+
 export const useCreateCharacter = (cid: string) => {
   const qc = useQueryClient()
   return useMutation({

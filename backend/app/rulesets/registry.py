@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from app.core.exceptions import NotFoundError
 from app.game.rules.base_ruleset import BaseRuleset
+from app.rulesets.alien_rpg.ruleset import AlienRPGRuleset
+from app.rulesets.dnd5e.ruleset import DnD5eRuleset
 from app.rulesets.generic.ruleset import GenericRuleset
+from app.rulesets.one_ring.ruleset import OneRingRuleset
 
 _REGISTRY: dict[str, BaseRuleset] = {}
 
@@ -25,18 +28,15 @@ def get_ruleset(ruleset_id: str) -> BaseRuleset:
 
 
 def list_rulesets() -> list[dict]:
-    """Return metadata for all registered + advertised rulesets."""
-    implemented = [
+    """Return metadata for all registered rulesets (all now available)."""
+    return [
         {"id": rs.id, "name": rs.name, "description": rs.description, "status": "available"}
         for rs in _REGISTRY.values()
     ]
-    placeholders = [
-        {"id": "dnd5e", "name": "D&D 5e (coming soon)", "description": "d20 system adapter.", "status": "planned"},
-        {"id": "one_ring", "name": "The One Ring (coming soon)", "description": "Middle-earth adventuring.", "status": "planned"},
-        {"id": "alien", "name": "Alien RPG (coming soon)", "description": "Sci-fi horror, stress dice.", "status": "planned"},
-    ]
-    return implemented + placeholders
 
 
 # Auto-register built-in rulesets on import.
 register(GenericRuleset())
+register(DnD5eRuleset())
+register(OneRingRuleset())
+register(AlienRPGRuleset())

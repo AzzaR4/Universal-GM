@@ -8,6 +8,7 @@ import type {
   ProviderPreset,
   Quest,
   Ruleset,
+  CombatResponse,
 } from '../types'
 
 const BASE = '/api'
@@ -87,6 +88,32 @@ export const api = {
 
   // Quests
   listQuests: (cid: string) => req<Quest[]>(`/campaigns/${cid}/quests`).catch(() => []),
+
+  // Combat
+  getCombat: (cid: string) => req<CombatResponse>(`/campaigns/${cid}/combat`),
+  startCombat: (cid: string, data: { enemy_ids?: string[]; default_enemy_hp?: number } = {}) =>
+    req<CombatResponse>(`/campaigns/${cid}/combat/start`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  combatAction: (
+    cid: string,
+    data: {
+      actor_id?: string | null
+      target_id?: string | null
+      action_type?: string
+      skill_used?: string | null
+      description?: string
+      metadata?: Record<string, any>
+      end_turn?: boolean
+    },
+  ) =>
+    req<CombatResponse>(`/campaigns/${cid}/combat/action`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  endCombat: (cid: string) =>
+    req<CombatResponse>(`/campaigns/${cid}/combat/end`, { method: 'POST' }),
 
   // AI providers
   listProviders: () => req<AIProvider[]>('/settings/providers'),

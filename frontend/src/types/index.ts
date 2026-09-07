@@ -117,6 +117,42 @@ export interface DiceResult {
   outcome_label: string
 }
 
+export interface Combatant {
+  id: string
+  name: string
+  is_player: boolean
+  initiative: number
+  hp_current: number
+  hp_max: number
+  resource: string
+  status: string
+  is_npc: boolean
+}
+
+export interface CombatState {
+  active: boolean
+  round: number
+  turn_index: number
+  combatants: Combatant[]
+  log: string[]
+  current_id: string | null
+  is_over: boolean
+}
+
+export interface CombatResult {
+  outcome: string
+  outcome_label: string
+  dice: DiceRoll | null
+  damage: number
+  mechanical_description: string
+}
+
+export interface CombatResponse {
+  active: boolean
+  combat: CombatState | null
+  result?: CombatResult
+}
+
 export type NarrativeMessage = {
   id: string
   role: 'player' | 'gm' | 'system'

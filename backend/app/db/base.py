@@ -42,3 +42,21 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_lightweight_migrations)
+
+
+def _lightweight_migrations(conn) -> None:
+    """Add newly-introduced columns to existing tables (SQLite-friendly).
+
+    create_all never ALTERs existing tables, so for a pre-existing dev database we
+    add the additive `campaigns.active_combat` column if it is missing.
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(conn)
+    try:
+        columns = {c["name"] for c in inspector.get_columns("campaigns")}
+    except Exception:  # noqa: BLE001 - table may not exist yet on fresh DBs
+        return
+    if "active_combat" not in columns:
+        conn.execute(text("ALTER TABLE campaigns ADD COLUMN active_combat JSON"))

@@ -95,3 +95,15 @@ class BaseRuleset(ABC):
     @abstractmethod
     def system_prompt_fragment(self, state: GameState) -> str:
         """Return a GM system-prompt fragment describing how to run this system."""
+
+    # ------------------------------------------------------------------ #
+    # Optional hooks with sensible defaults (non-abstract).
+    # ------------------------------------------------------------------ #
+    def get_initiative(self, character_data: dict[str, Any]) -> int:
+        """Return an initiative score for a combatant given its ruleset_data.
+
+        The default is a stable neutral value; system-specific rulesets override
+        this to use the appropriate attribute/roll (e.g. DEX modifier for D&D).
+        Combatants are ordered by descending initiative.
+        """
+        return 10

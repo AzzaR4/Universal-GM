@@ -107,9 +107,14 @@ class GenericRuleset(BaseRuleset):
         if not config.use_dice:
             return self._resolve_no_check(intent, state, actor)
 
-        # Perform a 2d6 (or configured) roll.
-        dice = roll_dice(config.default_dice, rng=rng)
-        outcome = self._map_outcome(dice.total)
+        # Rules-heavy mode uses a single d20 with a finer outcome band; rules-light
+        # uses the configured dice (default 2d6).
+        if config.resolution_mode == "rules_heavy":
+            dice = roll_dice("1d20", rng=rng)
+            outcome = self._map_outcome_d20(dice.total)
+        else:
+            dice = roll_dice(config.default_dice, rng=rng)
+            outcome = self._map_outcome(dice.total)
         result = ActionResult(
             intent=intent,
             check_required=True,
@@ -118,7 +123,7 @@ class GenericRuleset(BaseRuleset):
             outcome_label=OUTCOME_LABELS[outcome],
         )
         result.mechanical_description = self._describe(intent, outcome, actor)
-        result.state_mutations = self._mutations_for(intent, outcome, state, actor)
+        result.state_mutations = self._mutations_for(intent, outcome, state, actor, rng)
         return result
 
     def _resolve_no_check(
@@ -155,6 +160,19 @@ class GenericRuleset(BaseRuleset):
         return "failure"
 
     @staticmethod
+    def _map_outcome_d20(total: int) -> str:
+        """Rules-heavy single-d20 outcome bands."""
+        if total >= 18:
+            return "critical_success"
+        if total >= 11:
+            return "success"
+        if total >= 6:
+            return "partial"
+        if total <= 1:
+            return "critical_failure"
+        return "failure"
+
+    @staticmethod
     def _describe(intent: ActionIntent, outcome: str, actor) -> str:
         name = actor.name if actor else "The character"
         verb = {
@@ -165,17 +183,11 @@ class GenericRuleset(BaseRuleset):
         return f"{name} {verb} — {OUTCOME_LABELS[outcome]}."
 
     def _mutations_for(
-        self, intent: ActionIntent, outcome: str, state: GameState, actor
+        self, intent: ActionIntent, outcome: str, state: GameState, actor, rng=None
     ) -> list[StateMutation]:
         mutations: list[StateMutation] = []
         if intent.action_type == "attack" and intent.target_id:
-            damage = {
-                "critical_success": 4,
-                "success": 3,
-                "partial": 1,
-                "failure": 0,
-                "critical_failure": 0,
-            }.get(outcome, 0)
+            damage = self._damage_for(intent, outcome, rng)
             if damage > 0:
                 mutations.append(
                     DamageMutation(character_id=intent.target_id, resource="Health", amount=damage)
@@ -187,6 +199,35 @@ class GenericRuleset(BaseRuleset):
             if outcome == "critical_failure" and actor:
                 mutations.append(AddConditionMutation(character_id=actor.id, condition="Wounded"))
         return mutations
+
+    @staticmethod
+    def _damage_for(intent: ActionIntent, outcome: str, rng=None) -> int:
+        """Compute damage for an attack.
+
+        If the intent carries a `damage_dice` notation in metadata, roll it (and
+        double it on a critical success). Otherwise fall back to a default 1d6
+        scaled by the outcome so damage always tracks the mechanical result.
+        """
+        if outcome in {"failure", "critical_failure", "none"}:
+            return 0
+        dice_notation = (intent.metadata or {}).get("damage_dice") or "1d6"
+        try:
+            rolled = roll_dice(dice_notation, rng=rng).total
+        except Exception:  # noqa: BLE001 - bad notation degrades to default
+            rolled = roll_dice("1d6", rng=rng).total
+        if outcome == "critical_success":
+            rolled *= 2
+        elif outcome == "partial":
+            rolled = max(1, rolled // 2)
+        return max(1, rolled)
+
+    def get_initiative(self, character_data: dict[str, Any]) -> int:
+        attrs = (character_data or {}).get("attributes", {})
+        # Prefer an agility-like attribute; fall back to the neutral default.
+        for key in ("Agility", "AGI", "Dexterity", "Speed"):
+            if key in attrs:
+                return int(attrs[key])
+        return 10
 
     def system_prompt_fragment(self, state: GameState) -> str:
         gm_cfg = dict(state.gm_config or {})
