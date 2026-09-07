@@ -1,11 +1,23 @@
 # Python
 __pycache__/
+**/__pycache__/
 *.pyc
+**/*.pyc
+*.pyo
+**/*.pyo
 backend/.venv/
+.venv/
 .pytest_cache/
+
 # Data & secrets
 data/*.db
+backend/data/*.db
 .env
+*.env
+
 # Node
 frontend/node_modules/
 frontend/dist/
+
+# OS
+.DS_Store
