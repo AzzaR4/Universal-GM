@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+backend/.venv/
+.pytest_cache/
+# Data & secrets
+data/*.db
+.env
+# Node
+frontend/node_modules/
+frontend/dist/
