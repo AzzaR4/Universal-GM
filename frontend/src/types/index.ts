@@ -9,6 +9,7 @@ export interface Campaign {
   ruleset_config: Record<string, any>
   world_state: Record<string, any>
   current_location_id: string | null
+  current_session_id?: string | null
   is_active: boolean
   created_at: string
   updated_at: string
@@ -20,6 +21,7 @@ export interface Character {
   name: string
   description: string
   is_player_character: boolean
+  player_name?: string | null
   ruleset_data: {
     attributes?: Record<string, number>
     skills?: Record<string, number>
@@ -159,4 +161,88 @@ export type NarrativeMessage = {
   text: string
   dice?: DiceResult
   streaming?: boolean
+}
+
+// --------------------------- Session 3 --------------------------- //
+
+export interface Faction {
+  id: string
+  campaign_id: string
+  name: string
+  description: string
+  goals: any[]
+  resources: number
+  influence: number
+  disposition: string
+  relationships: Record<string, any>
+  autonomy_level: string
+  last_acted_at: string | null
+  created_at: string
+}
+
+export interface WorldEvent {
+  id: string
+  campaign_id: string
+  faction_id: string | null
+  event_type: string
+  title: string
+  description: string
+  impact: Record<string, any>
+  is_revealed: boolean
+  created_at: string
+}
+
+export interface Memory {
+  id: string
+  campaign_id: string
+  memory_type: string
+  subject_id: string | null
+  content: string
+  importance: number
+  keywords: string[]
+  tags: string[]
+  has_embedding: boolean
+  source_action_id: string | null
+  created_at: string
+}
+
+export interface GameSession {
+  id: string
+  campaign_id: string
+  started_at: string
+  ended_at: string | null
+  summary: string | null
+  key_events: any[]
+  player_actions_count: number
+  xp_awarded: number | null
+}
+
+export interface CustomRuleset {
+  id: string
+  name: string
+  display_name: string
+  description: string
+  dice_formula: string
+  roll_mode: string
+  success_threshold: number
+  attributes: any[]
+  resources: any[]
+  skills: any[]
+  prompt_instructions: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+// The flattened character-schema payload returned by GET /rulesets/:id/character-schema
+export interface CharacterSchema {
+  id: string
+  name: string
+  description: string
+  schema: Record<string, any>
+  attributes?: Record<string, any>
+  abilities?: Record<string, any>
+  resources?: Record<string, any>
+  skills?: Record<string, any>
+  [key: string]: any
 }

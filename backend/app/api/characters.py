@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import db_session
 from app.api.schemas import CharacterCreate, CharacterOut, CharacterUpdate
-from app.db.models import Campaign, Character
+from app.db.models import Campaign, Character, PartyMember
 from app.rulesets.registry import get_ruleset
 
 router = APIRouter(prefix="/api/campaigns/{campaign_id}/characters", tags=["characters"])
@@ -34,6 +34,7 @@ async def create_character(
         name=payload.name,
         description=payload.description,
         is_player_character=payload.is_player_character,
+        player_name=payload.player_name,
         ruleset_data=ruleset_data,
         conditions=payload.conditions,
         inventory=payload.inventory,
@@ -42,6 +43,14 @@ async def create_character(
     session.add(character)
     await session.commit()
     await session.refresh(character)
+
+    # Optionally enroll the new character into the campaign's active party.
+    if payload.add_to_party and character.is_player_character:
+        session.add(
+            PartyMember(campaign_id=campaign_id, character_id=character.id)
+        )
+        await session.commit()
+        await session.refresh(character)
     return character
 
 

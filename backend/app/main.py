@@ -14,19 +14,31 @@ from app.api import (
     combat,
     export,
     locations,
+    memories,
     npcs,
+    party,
+    rulesets_api,
     scenes,
+    sessions_api,
     settings as settings_api,
     stream,
+    world,
 )
 from app.config import settings
 from app.core.exceptions import DomainError
-from app.db.base import init_db
+from app.db.base import SessionLocal, init_db
+from app.rulesets import registry
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    # Load any DB-stored custom rulesets into the live registry.
+    try:
+        async with SessionLocal() as session:
+            await registry.load_custom_rulesets(session)
+    except Exception:  # noqa: BLE001 - never block startup on custom ruleset load
+        pass
     yield
 
 
@@ -63,3 +75,10 @@ app.include_router(scenes.router)
 app.include_router(stream.router)
 app.include_router(settings_api.router)
 app.include_router(export.router)
+# Session 3 routers.
+app.include_router(party.router)
+app.include_router(party.schema_router)
+app.include_router(world.router)
+app.include_router(memories.router)
+app.include_router(sessions_api.router)
+app.include_router(rulesets_api.router)

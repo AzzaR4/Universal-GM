@@ -45,6 +45,7 @@ class Campaign(Base):
     world_state: Mapped[dict] = mapped_column(JSON, default=dict)
     active_combat: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)
     current_location_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    current_session_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
@@ -70,6 +71,7 @@ class Character(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
     is_player_character: Mapped[bool] = mapped_column(Boolean, default=True)
+    player_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     ruleset_data: Mapped[dict] = mapped_column(JSON, default=dict)
     conditions: Mapped[list] = mapped_column(JSON, default=list)
     inventory: Mapped[list] = mapped_column(JSON, default=list)
@@ -181,6 +183,9 @@ class Memory(Base):
     content: Mapped[str] = mapped_column(Text, default="")
     importance: Mapped[float] = mapped_column(Float, default=0.5)
     keywords: Mapped[list] = mapped_column(JSON, default=list)
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    embedding: Mapped[list | None] = mapped_column(JSON, nullable=True, default=None)
+    source_action_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
@@ -211,7 +216,81 @@ class Session(Base):
     )
     started_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    summary: Mapped[str] = mapped_column(Text, default="")
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    key_events: Mapped[list] = mapped_column(JSON, default=list)
+    player_actions_count: Mapped[int] = mapped_column(Integer, default=0)
+    xp_awarded: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+
+
+class PartyMember(Base):
+    """Association table: which characters are in a campaign's active party."""
+
+    __tablename__ = "party_members"
+
+    campaign_id: Mapped[str] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), primary_key=True
+    )
+    character_id: Mapped[str] = mapped_column(
+        ForeignKey("characters.id", ondelete="CASCADE"), primary_key=True
+    )
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class Faction(Base):
+    __tablename__ = "factions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    campaign_id: Mapped[str] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="")
+    goals: Mapped[list] = mapped_column(JSON, default=list)
+    resources: Mapped[int] = mapped_column(Integer, default=50)
+    influence: Mapped[int] = mapped_column(Integer, default=50)
+    disposition: Mapped[str] = mapped_column(String(40), default="neutral")
+    relationships: Mapped[dict] = mapped_column(JSON, default=dict)
+    autonomy_level: Mapped[str] = mapped_column(String(40), default="active")
+    last_acted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class WorldEvent(Base):
+    __tablename__ = "world_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    campaign_id: Mapped[str] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="CASCADE"), index=True
+    )
+    faction_id: Mapped[str | None] = mapped_column(
+        ForeignKey("factions.id", ondelete="SET NULL"), nullable=True
+    )
+    event_type: Mapped[str] = mapped_column(String(80), default="faction_action")
+    title: Mapped[str] = mapped_column(String(300), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    impact: Mapped[dict] = mapped_column(JSON, default=dict)
+    is_revealed: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class CustomRuleset(Base):
+    __tablename__ = "custom_rulesets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(200), default="")
+    description: Mapped[str] = mapped_column(Text, default="")
+    dice_formula: Mapped[str] = mapped_column(String(40), default="1d20")
+    roll_mode: Mapped[str] = mapped_column(String(40), default="single")
+    success_threshold: Mapped[int] = mapped_column(Integer, default=6)
+    attributes: Mapped[list] = mapped_column(JSON, default=list)
+    resources: Mapped[list] = mapped_column(JSON, default=list)
+    skills: Mapped[list] = mapped_column(JSON, default=list)
+    prompt_instructions: Mapped[str] = mapped_column(Text, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
 __all__ = [
@@ -225,4 +304,8 @@ __all__ = [
     "Memory",
     "AIProvider",
     "Session",
+    "PartyMember",
+    "Faction",
+    "WorldEvent",
+    "CustomRuleset",
 ]

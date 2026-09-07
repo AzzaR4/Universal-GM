@@ -22,6 +22,10 @@ import CombatTracker from '../components/CombatTracker'
 import WorldPanel from '../components/WorldPanel'
 import DiceDisplay from '../components/DiceDisplay'
 import Modal from '../components/Modal'
+import PartyPanel from '../components/PartyPanel'
+import WorldTab from '../components/WorldTab'
+import MemoryBrowser from '../components/MemoryBrowser'
+import SessionLog from '../components/SessionLog'
 
 export default function Game() {
   const { id = '' } = useParams()
@@ -58,6 +62,7 @@ export default function Game() {
 
   const [input, setInput] = useState('')
   const [modal, setModal] = useState<ModalKind>(null)
+  const [rightTab, setRightTab] = useState<RightTab>('scene')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const pc = characters?.find((c) => c.is_player_character)
@@ -142,6 +147,9 @@ export default function Game() {
           <Button variant="secondary" onClick={exportCampaign}>
             ⬇ Export
           </Button>
+          <Link to="/rulesets/builder">
+            <Button variant="secondary">🛠️ Rulesets</Button>
+          </Link>
           <Link to="/settings">
             <Button variant="secondary">⚙ Settings</Button>
           </Link>
@@ -224,7 +232,7 @@ export default function Game() {
         </main>
 
         {/* Right */}
-        <aside className="hidden border-l border-ink-700 bg-ink-900/40 md:block">
+        <aside className="hidden flex-col border-l border-ink-700 bg-ink-900/40 md:flex">
           {combat ? (
             <CombatTracker
               combat={combat}
@@ -233,13 +241,41 @@ export default function Game() {
               onEnd={() => endCombat.mutate()}
             />
           ) : (
-            <WorldPanel
-              location={currentLocation}
-              npcs={npcsHere}
-              events={events || []}
-              onAddNPC={() => setModal('npc')}
-              onAddLocation={() => setModal('location')}
-            />
+            <>
+              <div className="flex flex-shrink-0 border-b border-ink-700 text-xs">
+                {RIGHT_TABS.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setRightTab(t.key)}
+                    className={`flex-1 py-2 font-medium transition-colors ${
+                      rightTab === t.key
+                        ? 'bg-ink-800 text-ember-400'
+                        : 'text-ink-600 hover:text-ink-100'
+                    }`}
+                    title={t.label}
+                  >
+                    {t.icon}
+                  </button>
+                ))}
+              </div>
+              <div className="flex-1 overflow-hidden">
+                {rightTab === 'scene' && (
+                  <WorldPanel
+                    location={currentLocation}
+                    npcs={npcsHere}
+                    events={events || []}
+                    onAddNPC={() => setModal('npc')}
+                    onAddLocation={() => setModal('location')}
+                  />
+                )}
+                {rightTab === 'party' && (
+                  <PartyPanel campaignId={id} rulesetId={campaign?.ruleset_id} />
+                )}
+                {rightTab === 'world' && <WorldTab campaignId={id} />}
+                {rightTab === 'memory' && <MemoryBrowser campaignId={id} />}
+                {rightTab === 'sessions' && <SessionLog campaignId={id} />}
+              </div>
+            </>
           )}
         </aside>
       </div>
@@ -256,6 +292,16 @@ export default function Game() {
 }
 
 type ModalKind = null | 'npc' | 'location'
+
+type RightTab = 'scene' | 'party' | 'world' | 'memory' | 'sessions'
+
+const RIGHT_TABS: Array<{ key: RightTab; label: string; icon: string }> = [
+  { key: 'scene', label: 'Scene', icon: '🗺️' },
+  { key: 'party', label: 'Party', icon: '👥' },
+  { key: 'world', label: 'World', icon: '🌐' },
+  { key: 'memory', label: 'Memory', icon: '🧠' },
+  { key: 'sessions', label: 'Sessions', icon: '📜' },
+]
 
 // Small wrapper managing modal state via closure-free hook usage.
 function EntityModals({

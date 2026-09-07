@@ -2,13 +2,19 @@ import type {
   AIProvider,
   Campaign,
   Character,
+  CharacterSchema,
+  CustomRuleset,
   EventLogEntry,
+  Faction,
+  GameSession,
   Location,
+  Memory,
   NPC,
   ProviderPreset,
   Quest,
   Ruleset,
   CombatResponse,
+  WorldEvent,
 } from '../types'
 
 const BASE = '/api'
@@ -142,6 +148,80 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  // --------------------------- Party --------------------------- //
+  listParty: (cid: string) => req<Character[]>(`/campaigns/${cid}/party`),
+  addToParty: (cid: string, characterId: string) =>
+    req<Character[]>(`/campaigns/${cid}/party/${characterId}`, { method: 'POST' }),
+  removeFromParty: (cid: string, characterId: string) =>
+    req<any>(`/campaigns/${cid}/party/${characterId}`, { method: 'DELETE' }),
+  characterSchema: (rulesetId: string) =>
+    req<CharacterSchema>(`/rulesets/${rulesetId}/character-schema`),
+
+  // --------------------------- World / Factions --------------------------- //
+  listFactions: (cid: string) => req<Faction[]>(`/campaigns/${cid}/factions`),
+  createFaction: (cid: string, data: Partial<Faction>) =>
+    req<Faction>(`/campaigns/${cid}/factions`, { method: 'POST', body: JSON.stringify(data) }),
+  updateFaction: (cid: string, id: string, data: Partial<Faction>) =>
+    req<Faction>(`/campaigns/${cid}/factions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteFaction: (cid: string, id: string) =>
+    req<any>(`/campaigns/${cid}/factions/${id}`, { method: 'DELETE' }),
+
+  listWorldEvents: (cid: string, revealed?: boolean) =>
+    req<WorldEvent[]>(
+      `/campaigns/${cid}/world-events${revealed !== undefined ? `?revealed=${revealed}` : ''}`,
+    ),
+  createWorldEvent: (cid: string, data: Partial<WorldEvent>) =>
+    req<WorldEvent>(`/campaigns/${cid}/world-events`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  revealWorldEvent: (cid: string, id: string, isRevealed = true) =>
+    req<WorldEvent>(`/campaigns/${cid}/world-events/${id}?is_revealed=${isRevealed}`, {
+      method: 'PATCH',
+    }),
+  tickWorld: (cid: string, force = true) =>
+    req<WorldEvent[]>(`/campaigns/${cid}/world/tick?force=${force}`, { method: 'POST' }),
+
+  // --------------------------- Memories --------------------------- //
+  listMemories: (
+    cid: string,
+    params: { tag?: string; min_importance?: number; q?: string } = {},
+  ) => {
+    const qs = new URLSearchParams()
+    if (params.tag) qs.set('tag', params.tag)
+    if (params.min_importance != null) qs.set('min_importance', String(params.min_importance))
+    if (params.q) qs.set('q', params.q)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return req<Memory[]>(`/campaigns/${cid}/memories${suffix}`)
+  },
+  createMemory: (cid: string, data: Partial<Memory>) =>
+    req<Memory>(`/campaigns/${cid}/memories`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteMemory: (cid: string, id: string) =>
+    req<any>(`/campaigns/${cid}/memories/${id}`, { method: 'DELETE' }),
+
+  // --------------------------- Sessions --------------------------- //
+  listSessions: (cid: string) => req<GameSession[]>(`/campaigns/${cid}/sessions`),
+  startSession: (cid: string) =>
+    req<GameSession>(`/campaigns/${cid}/sessions/start`, { method: 'POST' }),
+  getSession: (cid: string, id: string) =>
+    req<GameSession>(`/campaigns/${cid}/sessions/${id}`),
+
+  // --------------------------- Custom Rulesets --------------------------- //
+  listCustomRulesets: () => req<CustomRuleset[]>('/rulesets/custom'),
+  getCustomRuleset: (id: string) => req<CustomRuleset>(`/rulesets/${id}`),
+  createCustomRuleset: (data: Partial<CustomRuleset>) =>
+    req<CustomRuleset>('/rulesets', { method: 'POST', body: JSON.stringify(data) }),
+  updateCustomRuleset: (id: string, data: Partial<CustomRuleset>) =>
+    req<CustomRuleset>(`/rulesets/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteCustomRuleset: (id: string) =>
+    req<any>(`/rulesets/${id}`, { method: 'DELETE' }),
+  exportRuleset: (id: string) => req<any>(`/rulesets/${id}/export`),
+  importRuleset: (data: any) =>
+    req<CustomRuleset>('/rulesets/import', { method: 'POST', body: JSON.stringify(data) }),
 }
 
 // SSE action streaming via fetch + ReadableStream (POST body support).
@@ -162,6 +242,48 @@ export async function streamAction(
   })
   if (!res.ok || !res.body) {
     throw new Error(`Action request failed: ${res.status}`)
+  }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const chunks = buffer.split('\n\n')
+    buffer = chunks.pop() || ''
+    for (const chunk of chunks) {
+      const lines = chunk.split('\n')
+      let eventType = 'message'
+      let dataStr = ''
+      for (const line of lines) {
+        if (line.startsWith('event:')) eventType = line.slice(6).trim()
+        else if (line.startsWith('data:')) dataStr += line.slice(5).trim()
+      }
+      if (dataStr) {
+        try {
+          onEvent({ type: eventType, data: JSON.parse(dataStr) })
+        } catch {
+          onEvent({ type: eventType, data: dataStr })
+        }
+      }
+    }
+  }
+}
+
+// Ends a session and streams the AI recap via SSE (same parser as streamAction).
+export async function streamSessionEnd(
+  campaignId: string,
+  sessionId: string,
+  onEvent: (ev: StreamEvent) => void,
+): Promise<void> {
+  const res = await fetch(`${BASE}/campaigns/${campaignId}/sessions/${sessionId}/end`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!res.ok || !res.body) {
+    throw new Error(`End session request failed: ${res.status}`)
   }
   const reader = res.body.getReader()
   const decoder = new TextDecoder()

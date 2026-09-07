@@ -40,6 +40,7 @@ class CampaignOut(BaseModel):
     ruleset_config: dict[str, Any]
     world_state: dict[str, Any]
     current_location_id: str | None
+    current_session_id: str | None = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -53,10 +54,12 @@ class CharacterCreate(BaseModel):
     name: str
     description: str = ""
     is_player_character: bool = True
+    player_name: str | None = None
     ruleset_data: dict[str, Any] | None = None
     conditions: list[Any] = Field(default_factory=list)
     inventory: list[Any] = Field(default_factory=list)
     location_id: str | None = None
+    add_to_party: bool = False
 
 
 class CharacterUpdate(BaseModel):
@@ -75,6 +78,7 @@ class CharacterOut(BaseModel):
     name: str
     description: str
     is_player_character: bool
+    player_name: str | None = None
     ruleset_data: dict[str, Any]
     conditions: list[Any]
     inventory: list[Any]
@@ -238,6 +242,171 @@ class EventLogOut(BaseModel):
     event_type: str
     data: dict[str, Any]
     timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --------------------------- Party --------------------------- #
+class PartyMemberOut(BaseModel):
+    campaign_id: str
+    character_id: str
+    joined_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --------------------------- Faction --------------------------- #
+class FactionCreate(BaseModel):
+    name: str
+    description: str = ""
+    goals: list[Any] = Field(default_factory=list)
+    resources: int = 50
+    influence: int = 50
+    disposition: str = "neutral"
+    relationships: dict[str, Any] = Field(default_factory=dict)
+    autonomy_level: str = "active"
+
+
+class FactionUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    goals: list[Any] | None = None
+    resources: int | None = None
+    influence: int | None = None
+    disposition: str | None = None
+    relationships: dict[str, Any] | None = None
+    autonomy_level: str | None = None
+
+
+class FactionOut(BaseModel):
+    id: str
+    campaign_id: str
+    name: str
+    description: str
+    goals: list[Any]
+    resources: int
+    influence: int
+    disposition: str
+    relationships: dict[str, Any]
+    autonomy_level: str
+    last_acted_at: datetime | None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class WorldEventCreate(BaseModel):
+    faction_id: str | None = None
+    event_type: str = "world_change"
+    title: str
+    description: str = ""
+    impact: dict[str, Any] = Field(default_factory=dict)
+    is_revealed: bool = True
+
+
+class WorldEventOut(BaseModel):
+    id: str
+    campaign_id: str
+    faction_id: str | None
+    event_type: str
+    title: str
+    description: str
+    impact: dict[str, Any]
+    is_revealed: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --------------------------- Memory --------------------------- #
+class MemoryCreate(BaseModel):
+    content: str
+    memory_type: str = "lore"
+    importance: float = 0.5
+    tags: list[Any] = Field(default_factory=list)
+    subject_id: str | None = None
+
+
+class MemoryOut(BaseModel):
+    id: str
+    campaign_id: str
+    memory_type: str
+    subject_id: str | None
+    content: str
+    importance: float
+    keywords: list[Any]
+    tags: list[Any]
+    has_embedding: bool = False
+    source_action_id: str | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --------------------------- Session --------------------------- #
+class SessionOut(BaseModel):
+    id: str
+    campaign_id: str
+    started_at: datetime
+    ended_at: datetime | None
+    summary: str | None
+    key_events: list[Any]
+    player_actions_count: int
+    xp_awarded: int | None
+
+    class Config:
+        from_attributes = True
+
+
+# --------------------------- Custom Ruleset --------------------------- #
+class CustomRulesetCreate(BaseModel):
+    name: str
+    display_name: str = ""
+    description: str = ""
+    dice_formula: str = "1d20"
+    roll_mode: str = "single"
+    success_threshold: int = 6
+    attributes: list[Any] = Field(default_factory=list)
+    resources: list[Any] = Field(default_factory=list)
+    skills: list[Any] = Field(default_factory=list)
+    prompt_instructions: str = ""
+    is_active: bool = True
+
+
+class CustomRulesetUpdate(BaseModel):
+    name: str | None = None
+    display_name: str | None = None
+    description: str | None = None
+    dice_formula: str | None = None
+    roll_mode: str | None = None
+    success_threshold: int | None = None
+    attributes: list[Any] | None = None
+    resources: list[Any] | None = None
+    skills: list[Any] | None = None
+    prompt_instructions: str | None = None
+    is_active: bool | None = None
+
+
+class CustomRulesetOut(BaseModel):
+    id: str
+    name: str
+    display_name: str
+    description: str
+    dice_formula: str
+    roll_mode: str
+    success_threshold: int
+    attributes: list[Any]
+    resources: list[Any]
+    skills: list[Any]
+    prompt_instructions: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
